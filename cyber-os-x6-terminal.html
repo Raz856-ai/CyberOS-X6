@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CyberOS-X6 Terminal AI</title>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background: black;
+      overflow: hidden;
+      font-family: 'Share Tech Mono', monospace;
+      color: #00ffcc;
+    }
+
+    body::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: radial-gradient(ellipse at center, rgba(0,255,200,0.1) 0%, rgba(0,0,0,0.9) 100%);
+      z-index: -1;
+      animation: backgroundMove 10s infinite alternate ease-in-out;
+    }
+
+    @keyframes backgroundMove {
+      0% { background-position: 0% 50%; }
+      100% { background-position: 100% 50%; }
+    }
+
+    #terminal {
+      padding: 20px;
+      height: 100vh;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      box-sizing: border-box;
+      scroll-behavior: smooth;
+    }
+
+    .input-line {
+      color: #00ffcc;
+    }
+
+    .response {
+      color: #ffaa00;
+    }
+
+    .cursor {
+      display: inline-block;
+      width: 10px;
+      height: 18px;
+      background: #00ffcc;
+      animation: blink 1s step-end infinite;
+    }
+
+    @keyframes blink {
+      50% { opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div id="terminal"></div>
+  <audio id="keySound" src="https://www.soundjay.com/button/beep-07.wav" preload="auto"></audio>
+  <script>
+    const terminal = document.getElementById("terminal");
+    const keySound = document.getElementById("keySound");
+    const colors = ['#00ffcc', '#ffaa00', '#ff0066', '#33ff00', '#00aaff', '#ff3333'];
+    let currentColor = 0;
+    let input = "";
+    let lineCount = 0;
+    let currentLang = "en";
+
+    const cursor = document.createElement("span");
+    cursor.classList.add("cursor");
+
+    const detectLang = (txt) => {
+      if (/[؀-ۿ]/.test(txt)) return "ur-PK";
+      if (/[а-яА-ЯЁё]/.test(txt)) return "ru-RU";
+      if (/[éèêàçôù]/i.test(txt)) return "fr-FR";
+      return "en-US";
+    };
+
+    const speak = (text) => {
+      const msg = new SpeechSynthesisUtterance(text);
+      msg.lang = detectLang(text);
+      msg.rate = 1;
+      window.speechSynthesis.cancel();
+      speechSynthesis.speak(msg);
+    };
+
+    const addLine = (text, className = "response") => {
+      const line = document.createElement("div");
+      line.className = className;
+      line.innerText = text;
+      line.style.color = colors[currentColor];
+      terminal.appendChild(line);
+      lineCount++;
+      if (lineCount % 12 === 0) currentColor = 0;
+      else currentColor = (currentColor + 1) % colors.length;
+      autoScroll();
+    };
+
+    const autoScroll = () => {
+      requestAnimationFrame(() => {
+        terminal.scrollTop = terminal.scrollHeight;
+      });
+    };
+
+    const getAIResponse = async (text) => {
+      try {
+        const res = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer YOUR_API_KEY_HERE" // Replace this
+          },
+          body: JSON.stringify({
+            model: "gpt-4",
+            messages: [{ role: "user", content: text }],
+            temperature: 0.7
+          })
+        });
+        const data = await res.json();
+        return data.choices[0].message.content.trim();
+      } catch (err) {
+        return "Error reaching AI brain. Check network or API key.";
+      }
+    };
+
+    const renderInputLine = () => {
+      if (terminal.lastChild?.classList?.contains("input-line")) {
+        terminal.removeChild(terminal.lastChild);
+      }
+      const line = document.createElement("div");
+      line.className = "input-line";
+      line.innerText = "> " + input;
+      line.style.color = colors[currentColor];
+      line.appendChild(cursor);
+      terminal.appendChild(line);
+      autoScroll();
+    };
+
+    document.addEventListener("keydown", async (e) => {
+      if (e.key === "Backspace") {
+        input = input.slice(0, -1);
+        renderInputLine();
+      } else if (e.key === "Enter") {
+        if (terminal.lastChild?.classList?.contains("input-line")) {
+          terminal.removeChild(terminal.lastChild);
+        }
+        addLine("> " + input, "input-line");
+        if (input.startsWith("/lang ")) {
+          currentLang = input.split(" ")[1];
+          addLine("Language set to: " + currentLang);
+          input = "";
+          renderInputLine();
+          return;
+        }
+        const response = await getAIResponse(input);
+        addLine(response);
+        speak(response);
+        input = "";
+        renderInputLine();
+      } else if (e.key.length === 1) {
+        input += e.key;
+        keySound.currentTime = 0;
+        keySound.play();
+        renderInputLine();
+      }
+    });
+
+    const bootSequence = [
+      "Initializing CyberOS-X6...",
+      "Loading neural engine...",
+      "Establishing multilingual brain...",
+      "AI modules connected to OpenAI...",
+      "CyberOS-X6 is now fully online.\n"
+    ];
+
+    const startBoot = async () => {
+      for (const line of bootSequence) {
+        addLine(line);
+        await new Promise(r => setTimeout(r, 800));
+      }
+      renderInputLine();
+    };
+
+    startBoot();
+  </script>
+</body>
+</html>
